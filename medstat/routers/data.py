@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 
 import pandas as pd
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -44,24 +44,34 @@ def _describe_df(df: pd.DataFrame) -> dict:
 
 
 @router.post("/upload")
-async def upload_file(file: UploadFile = File(...)) -> dict:
-    """Upload a CSV or Excel file; returns column metadata and full data."""
+async def upload_file(file: UploadFile = File(...), sheet: str = Form(None)) -> dict:
+    """Upload a CSV or Excel file; returns column metadata and full data.
+
+    For Excel files the response includes a ``sheets`` list. Pass ``sheet``
+    to select a specific sheet; defaults to the first sheet.
+    """
     content = await file.read()
     name = file.filename or ""
 
     try:
         if name.endswith(".csv"):
             df = pd.read_csv(io.BytesIO(content))
+            return _describe_df(df)
         elif name.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(io.BytesIO(content))
+            xf = pd.ExcelFile(io.BytesIO(content))
+            sheets = xf.sheet_names
+            selected = sheet if (sheet and sheet in sheets) else sheets[0]
+            df = xf.parse(selected)
+            result = _describe_df(df)
+            result["sheets"] = sheets
+            result["active_sheet"] = selected
+            return result
         else:
             raise HTTPException(status_code=400, detail="Unsupported file type. Use CSV or Excel (.xlsx/.xls).")
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Failed to parse file: {exc}") from exc
-
-    return _describe_df(df)
 
 
 class REDCapRequest(BaseModel):

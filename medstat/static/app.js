@@ -39,12 +39,56 @@ async function postJSON(url, body) {
   return data;
 }
 
-async function uploadFile(url, file) {
-  const fd = new FormData(); fd.append('file', file);
+async function uploadFile(url, file, sheet) {
+  const fd = new FormData();
+  fd.append('file', file);
+  if (sheet) fd.append('sheet', sheet);
   const resp = await fetch(url, {method:'POST', body: fd});
   const data = await resp.json();
   if (!resp.ok) throw new Error(data.detail || resp.statusText);
   return data;
+}
+
+// ── Sheet picker ─────────────────────────────────────────────────────
+// If an Excel upload returns multiple sheets, show an inline picker
+// and re-upload with the chosen sheet before calling onDone(data).
+async function _handleUploadResult(raw, file, zone, onDone) {
+  if (!raw.sheets || raw.sheets.length <= 1) {
+    onDone(raw);
+    return;
+  }
+  // Build or reuse picker row
+  let picker = zone.parentElement.querySelector('.sheet-picker');
+  if (!picker) {
+    picker = document.createElement('div');
+    picker.className = 'sheet-picker d-flex align-items-center gap-2 mt-2 flex-wrap';
+    zone.after(picker);
+  }
+  picker.innerHTML =
+    `<span class="text-muted small"><i class="bi bi-layers me-1"></i>Sheet:</span>` +
+    raw.sheets.map(s =>
+      `<button class="btn btn-sm ${s === raw.active_sheet ? 'btn-primary' : 'btn-outline-secondary'} sheet-btn" data-sheet="${s}">${s}</button>`
+    ).join('');
+
+  picker.querySelectorAll('.sheet-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      picker.querySelectorAll('.sheet-btn').forEach(b => {
+        b.className = b === btn ? 'btn btn-sm btn-primary sheet-btn' : 'btn btn-sm btn-outline-secondary sheet-btn';
+      });
+      try {
+        const newRaw = await uploadFile('/api/data/upload', file, btn.dataset.sheet);
+        // keep picker updated with new active sheet label
+        picker.querySelectorAll('.sheet-btn').forEach(b => {
+          b.className = b.dataset.sheet === newRaw.active_sheet
+            ? 'btn btn-sm btn-primary sheet-btn'
+            : 'btn btn-sm btn-outline-secondary sheet-btn';
+        });
+        onDone(newRaw);
+      } catch(err) { alert('Failed to load sheet: ' + err.message); }
+    });
+  });
+
+  onDone(raw); // also apply the first sheet immediately
 }
 
 function showError(container, msg) {
@@ -275,12 +319,14 @@ function _applySurvData(data) {
 initUploadZone('surv-upload-zone', 'surv-file', async file => {
   try {
     const raw = await uploadFile('/api/data/upload', file);
-    _applySurvData(raw);
     const zone = $('surv-upload-zone');
-    zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${raw.n_rows} rows)`;
-    _addPreviewBtn(zone, raw, file.name, d => {
-      _applySurvData(d);
-      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+    _handleUploadResult(raw, file, zone, data => {
+      _applySurvData(data);
+      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${data.n_rows} rows)`;
+      _addPreviewBtn(zone, data, file.name, d => {
+        _applySurvData(d);
+        zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+      });
     });
   } catch(err) { alert('Upload failed: ' + err.message); }
 });
@@ -446,12 +492,14 @@ function _applyMetaData(data) {
 initUploadZone('meta-upload-zone', 'meta-file', async file => {
   try {
     const raw = await uploadFile('/api/data/upload', file);
-    _applyMetaData(raw);
     const zone = $('meta-upload-zone');
-    zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${raw.n_rows} rows)`;
-    _addPreviewBtn(zone, raw, file.name, d => {
-      _applyMetaData(d);
-      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+    _handleUploadResult(raw, file, zone, data => {
+      _applyMetaData(data);
+      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${data.n_rows} rows)`;
+      _addPreviewBtn(zone, data, file.name, d => {
+        _applyMetaData(d);
+        zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+      });
     });
   } catch(e) { alert(e.message); }
 });
@@ -582,12 +630,14 @@ function _applyTtestData(data) {
 initUploadZone('ttest-upload-zone', 'ttest-file', async file => {
   try {
     const raw = await uploadFile('/api/data/upload', file);
-    _applyTtestData(raw);
     const zone = $('ttest-upload-zone');
-    zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${raw.n_rows} rows)`;
-    _addPreviewBtn(zone, raw, file.name, d => {
-      _applyTtestData(d);
-      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+    _handleUploadResult(raw, file, zone, data => {
+      _applyTtestData(data);
+      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${data.n_rows} rows)`;
+      _addPreviewBtn(zone, data, file.name, d => {
+        _applyTtestData(d);
+        zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+      });
     });
   } catch(e) { alert(e.message); }
 });
@@ -675,12 +725,14 @@ function _applyAnovaData(data) {
 initUploadZone('anova-upload-zone', 'anova-file', async file => {
   try {
     const raw = await uploadFile('/api/data/upload', file);
-    _applyAnovaData(raw);
     const zone = $('anova-upload-zone');
-    zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${raw.n_rows} rows)`;
-    _addPreviewBtn(zone, raw, file.name, d => {
-      _applyAnovaData(d);
-      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+    _handleUploadResult(raw, file, zone, data => {
+      _applyAnovaData(data);
+      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${data.n_rows} rows)`;
+      _addPreviewBtn(zone, data, file.name, d => {
+        _applyAnovaData(d);
+        zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+      });
     });
   } catch(e) { alert(e.message); }
 });
@@ -963,12 +1015,14 @@ function _applyLogisticData(data) {
 initUploadZone('logistic-upload-zone', 'logistic-file', async file => {
   try {
     const raw = await uploadFile('/api/data/upload', file);
-    _applyLogisticData(raw);
     const zone = $('logistic-upload-zone');
-    zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${raw.n_rows} rows)`;
-    _addPreviewBtn(zone, raw, file.name, d => {
-      _applyLogisticData(d);
-      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+    _handleUploadResult(raw, file, zone, data => {
+      _applyLogisticData(data);
+      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${data.n_rows} rows)`;
+      _addPreviewBtn(zone, data, file.name, d => {
+        _applyLogisticData(d);
+        zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+      });
     });
   } catch(e) { alert(e.message); }
 });
@@ -1085,12 +1139,14 @@ function _applyBioData(data) {
 initUploadZone('bio-upload-zone', 'bio-file', async file => {
   try {
     const raw = await uploadFile('/api/data/upload', file);
-    _applyBioData(raw);
     const zone = $('bio-upload-zone');
-    zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${raw.n_rows} rows)`;
-    _addPreviewBtn(zone, raw, file.name, d => {
-      _applyBioData(d);
-      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+    _handleUploadResult(raw, file, zone, data => {
+      _applyBioData(data);
+      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${data.n_rows} rows)`;
+      _addPreviewBtn(zone, data, file.name, d => {
+        _applyBioData(d);
+        zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+      });
     });
   } catch(e) { alert(e.message); }
 });
@@ -1176,6 +1232,332 @@ function renderROC(r) {
           <td>${(sel.sensitivity*100).toFixed(1)}%</td><td>${(sel.specificity*100).toFixed(1)}%</td></tr></tbody></table>`;
   }
   $('bio-stats').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// FIGURES
+// ══════════════════════════════════════════════════════════════════════
+let figData = null;
+
+// ── Math helpers ──────────────────────────────────────────────────────
+function _fmean(arr) { return arr.reduce((a, b) => a + b, 0) / arr.length; }
+function _fsd(arr) {
+  const m = _fmean(arr);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - m) ** 2, 0) / (arr.length - 1));
+}
+function _fsem(arr) { return _fsd(arr) / Math.sqrt(arr.length); }
+
+function _pearson(xs, ys) {
+  const n = xs.length, mx = _fmean(xs), my = _fmean(ys);
+  let num = 0, dx2 = 0, dy2 = 0;
+  for (let i = 0; i < n; i++) { num += (xs[i]-mx)*(ys[i]-my); dx2 += (xs[i]-mx)**2; dy2 += (ys[i]-my)**2; }
+  return (dx2 > 0 && dy2 > 0) ? num / Math.sqrt(dx2 * dy2) : 0;
+}
+
+function _rank(arr) {
+  const sorted = [...arr].map((v, i) => [v, i]).sort((a, b) => a[0] - b[0]);
+  const ranks = new Array(arr.length);
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i;
+    while (j < sorted.length && sorted[j][0] === sorted[i][0]) j++;
+    const avg = (i + j - 1) / 2 + 1;
+    for (let k = i; k < j; k++) ranks[sorted[k][1]] = avg;
+    i = j;
+  }
+  return ranks;
+}
+function _spearman(xs, ys) { return _pearson(_rank(xs), _rank(ys)); }
+
+function _linreg(xs, ys) {
+  const mx = _fmean(xs), my = _fmean(ys);
+  let ssxy = 0, ssxx = 0;
+  for (let i = 0; i < xs.length; i++) { ssxy += (xs[i]-mx)*(ys[i]-my); ssxx += (xs[i]-mx)**2; }
+  const slope = ssxx > 0 ? ssxy / ssxx : 0;
+  return { slope, intercept: my - slope * mx, r: _pearson(xs, ys) };
+}
+
+function _qnorm(p) {
+  const a = [2.515517, 0.802853, 0.010328], b = [1.432788, 0.189269, 0.001308];
+  const q = p < 0.5 ? p : 1 - p;
+  const t = Math.sqrt(-2 * Math.log(q));
+  const v = t - (a[0] + t*(a[1] + t*a[2])) / (1 + t*(b[0] + t*(b[1] + t*b[2])));
+  return p < 0.5 ? -v : v;
+}
+
+// ── Column helpers ────────────────────────────────────────────────────
+function _fcol(name) { return figData.data.map(r => parseFloat(r[name])).filter(v => !isNaN(v)); }
+function _fcolStr(name) { return figData.data.map(r => String(r[name] ?? '')); }
+function _fgroups(col) { return col ? [...new Set(_fcolStr(col))].filter(Boolean) : null; }
+
+// ── Populate selects ──────────────────────────────────────────────────
+function _figPopulate(data) {
+  const num = data.columns.filter(c => c.col_type === 'numeric');
+  const all = data.columns;
+
+  const fill = (id, cols, none) => {
+    const s = $(id); if (!s) return;
+    s.innerHTML = none ? '<option value="">— none —</option>' : '';
+    cols.forEach(c => s.appendChild(new Option(c.name, c.name)));
+  };
+  const fillMulti = (id, cols) => {
+    const s = $(id); if (!s) return;
+    s.innerHTML = '';
+    cols.forEach(c => { const o = new Option(c.name, c.name); o.selected = true; s.appendChild(o); });
+  };
+
+  fill('fig-hist-col', num, false);  fill('fig-hist-grp', all, true);
+  fill('fig-box-val', num, false);   fill('fig-box-grp', all, true);
+  fill('fig-bar-val', num, false);   fill('fig-bar-grp', all, false);
+  fill('fig-scat-x', num, false);    fill('fig-scat-y', num, false);
+  fill('fig-scat-grp', all, true);
+  fill('fig-line-x', num, false);    fill('fig-line-y', num, false);
+  fill('fig-line-grp', all, true);
+  fill('fig-qq-col', num, false);
+  fill('fig-ba-m1', num, false);     fill('fig-ba-m2', num, false);
+  fill('fig-wf-label', all, false);  fill('fig-wf-val', num, false);
+  fillMulti('fig-heat-cols', num);
+
+  // default Y / Method 2 to second column
+  ['fig-scat-y','fig-line-y','fig-ba-m2'].forEach(id => {
+    const s = $(id); if (s && s.options.length > 1) s.selectedIndex = 1;
+  });
+}
+
+function _applyFigData(data) {
+  figData = data;
+  _figPopulate(data);
+  $('fig-config-card').style.display = 'block';
+  $('fig-plot-btn').style.display = 'block';
+}
+
+initUploadZone('fig-upload-zone', 'fig-file', async file => {
+  try {
+    const raw = await uploadFile('/api/data/upload', file);
+    const zone = $('fig-upload-zone');
+    _handleUploadResult(raw, file, zone, data => {
+      _applyFigData(data);
+      zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${data.n_rows} rows)`;
+      _addPreviewBtn(zone, data, file.name, d => {
+        _applyFigData(d);
+        zone.querySelector('.fw-semibold').textContent = `✓ ${file.name} (${d.n_rows} rows selected)`;
+      });
+    });
+  } catch(e) { alert(e.message); }
+});
+
+// opacity slider label
+$('fig-hist-opacity').addEventListener('input', () => {
+  $('fig-hist-opacity-val').textContent = $('fig-hist-opacity').value;
+});
+
+// figure type switch
+$('fig-type').addEventListener('change', () => {
+  document.querySelectorAll('.fig-opts').forEach(el => el.classList.remove('active'));
+  const t = $(`opts-${$('fig-type').value}`);
+  if (t) t.classList.add('active');
+});
+
+// plot button
+$('fig-plot-btn')._origLabel = $('fig-plot-btn').innerHTML;
+$('fig-plot-btn').addEventListener('click', () => {
+  if (!figData) return;
+  try {
+    ({ histogram:figHistogram, box:figBox, bar:figBar, scatter:figScatter,
+       line:figLine, qq:figQQ, bland:figBland, heatmap:figHeatmap, waterfall:figWaterfall
+    })[$('fig-type').value]();
+    $('fig-placeholder').style.display = 'none';
+    $('fig-chart-area').style.display = 'block';
+  } catch(e) { alert('Plot error: ' + e.message); }
+});
+
+const _LAY = extra => ({ ...LAYOUT_BASE, ...extra });
+
+// ── 1. Histogram ──────────────────────────────────────────────────────
+function figHistogram() {
+  const col = $('fig-hist-col').value, grp = $('fig-hist-grp').value;
+  const bins = parseInt($('fig-hist-bins').value) || 20;
+  const opacity = parseFloat($('fig-hist-opacity').value);
+  let traces;
+  if (grp) {
+    traces = _fgroups(grp).map((g, i) => ({
+      x: figData.data.filter(r => r[grp] == g).map(r => parseFloat(r[col])).filter(v => !isNaN(v)),
+      type:'histogram', name:String(g), opacity, nbinsx:bins, marker:{color:COLORS[i%COLORS.length]}
+    }));
+  } else {
+    traces = [{ x:_fcol(col), type:'histogram', nbinsx:bins, opacity, marker:{color:COLORS[0]} }];
+  }
+  Plotly.newPlot('fig-chart', traces,
+    _LAY({ barmode: grp ? 'overlay':'stack', xaxis:{title:col}, yaxis:{title:'Count'} }), PLOTLY_CFG);
+  $('fig-description').innerHTML = `<strong>Histogram</strong> — distribution of <em>${col}</em>${grp ? `, grouped by <em>${grp}</em>` : ''}.`;
+}
+
+// ── 2. Box / Violin ───────────────────────────────────────────────────
+function figBox() {
+  const val = $('fig-box-val').value, grp = $('fig-box-grp').value;
+  const ptype = $('fig-box-type').value, pts = $('fig-box-points').checked;
+  const groups = grp ? _fgroups(grp) : [null];
+  const traces = groups.map((g, i) => {
+    const ys = g ? figData.data.filter(r => r[grp] == g).map(r => parseFloat(r[val])).filter(v => !isNaN(v)) : _fcol(val);
+    const base = { y:ys, name: g ? String(g) : val, marker:{color:COLORS[i%COLORS.length]} };
+    return ptype === 'violin'
+      ? { ...base, type:'violin', box:{visible:true}, meanline:{visible:true}, points: pts?'all':false, jitter:0.3 }
+      : { ...base, type:'box', boxpoints: pts?'all':false, jitter:0.3 };
+  });
+  Plotly.newPlot('fig-chart', traces, _LAY({ yaxis:{title:val} }), PLOTLY_CFG);
+  $('fig-description').innerHTML = `<strong>${ptype==='violin'?'Violin':'Box'} plot</strong> of <em>${val}</em>${grp?` by <em>${grp}</em>`:''}.`;
+}
+
+// ── 3. Bar chart (mean ± error) ───────────────────────────────────────
+function figBar() {
+  const val = $('fig-bar-val').value, grp = $('fig-bar-grp').value, errType = $('fig-bar-err').value;
+  const groups = grp ? _fgroups(grp) : ['All'];
+  const xs=[], means=[], errs=[], ns=[];
+  groups.forEach(g => {
+    const vals = grp ? figData.data.filter(r=>r[grp]==g).map(r=>parseFloat(r[val])).filter(v=>!isNaN(v)) : _fcol(val);
+    if (!vals.length) return;
+    xs.push(String(g)); means.push(_fmean(vals)); ns.push(vals.length);
+    errs.push(errType==='sd'?_fsd(vals): errType==='sem'?_fsem(vals): errType==='ci95'?1.96*_fsem(vals):0);
+  });
+  Plotly.newPlot('fig-chart', [{
+    x:xs, y:means, type:'bar',
+    error_y: errType!=='none' ? {type:'data',array:errs,visible:true} : undefined,
+    marker:{color:COLORS.slice(0,xs.length)},
+    text:ns.map(n=>`n=${n}`), textposition:'outside',
+  }], _LAY({ yaxis:{title:val}, xaxis:{title:grp||''} }), PLOTLY_CFG);
+  const labels={sd:'± SD',sem:'± SEM',ci95:'± 95% CI',none:''};
+  $('fig-description').innerHTML = `<strong>Bar chart</strong> — Mean ${labels[errType]} of <em>${val}</em>${grp?` by <em>${grp}</em>`:''}.`;
+}
+
+// ── 4. Scatter plot ───────────────────────────────────────────────────
+function figScatter() {
+  const xc=$('fig-scat-x').value, yc=$('fig-scat-y').value, grp=$('fig-scat-grp').value;
+  const showReg=$('fig-scat-reg').checked, showCI=$('fig-scat-ci').checked;
+  const traces=[];
+  const addReg = (xs, ys, color) => {
+    if (xs.length < 2) return;
+    const reg=_linreg(xs,ys), xMin=Math.min(...xs), xMax=Math.max(...xs);
+    const nPts=60, xFit=Array.from({length:nPts},(_,k)=>xMin+(xMax-xMin)*k/(nPts-1));
+    const yFit=xFit.map(x=>reg.slope*x+reg.intercept);
+    traces.push({x:xFit,y:yFit,mode:'lines',type:'scatter',
+      name:`r=${reg.r.toFixed(3)}`,line:{color,dash:'dot'},showlegend:true});
+    if (showCI && xs.length>3) {
+      const n=xs.length,mx=_fmean(xs),ssxx=xs.reduce((s,v)=>s+(v-mx)**2,0);
+      const res=xs.map((x,i)=>ys[i]-(reg.slope*x+reg.intercept));
+      const mse=res.reduce((s,v)=>s+v*v,0)/(n-2);
+      const se=xFit.map(x=>Math.sqrt(mse*(1/n+(x-mx)**2/ssxx)));
+      traces.push({x:[...xFit,...xFit.slice().reverse()],
+        y:[...yFit.map((y,i)=>y+1.96*se[i]),...yFit.slice().reverse().map((y,i)=>y-1.96*se[nPts-1-i])],
+        fill:'toself',type:'scatter',mode:'none',fillcolor:'rgba(29,78,216,0.1)',name:'95% CI',showlegend:true});
+    }
+  };
+  if (grp) {
+    _fgroups(grp).forEach((g,i) => {
+      const rows=figData.data.filter(r=>r[grp]==g);
+      const pairs=rows.map(r=>[parseFloat(r[xc]),parseFloat(r[yc])]).filter(([a,b])=>!isNaN(a)&&!isNaN(b));
+      const xs=pairs.map(p=>p[0]),ys=pairs.map(p=>p[1]);
+      traces.push({x:xs,y:ys,mode:'markers',type:'scatter',name:String(g),marker:{color:COLORS[i%COLORS.length],size:7}});
+      if (showReg) addReg(xs,ys,COLORS[i%COLORS.length]);
+    });
+  } else {
+    const pairs=figData.data.map(r=>[parseFloat(r[xc]),parseFloat(r[yc])]).filter(([a,b])=>!isNaN(a)&&!isNaN(b));
+    const xs=pairs.map(p=>p[0]),ys=pairs.map(p=>p[1]);
+    traces.push({x:xs,y:ys,mode:'markers',type:'scatter',name:'Data',marker:{color:COLORS[0],size:7}});
+    if (showReg) addReg(xs,ys,COLORS[1]);
+  }
+  Plotly.newPlot('fig-chart',traces,_LAY({xaxis:{title:xc},yaxis:{title:yc}}),PLOTLY_CFG);
+  $('fig-description').innerHTML=`<strong>Scatter plot</strong> — <em>${xc}</em> vs <em>${yc}</em>${grp?` by <em>${grp}</em>`:''}.`;
+}
+
+// ── 5. Line chart ─────────────────────────────────────────────────────
+function figLine() {
+  const xc=$('fig-line-x').value,yc=$('fig-line-y').value,grp=$('fig-line-grp').value;
+  const mode=$('fig-line-pts').checked?'lines+markers':'lines';
+  let traces;
+  if (grp) {
+    traces=_fgroups(grp).map((g,i)=>{
+      const rows=[...figData.data].filter(r=>r[grp]==g).sort((a,b)=>parseFloat(a[xc])-parseFloat(b[xc]));
+      return{x:rows.map(r=>parseFloat(r[xc])),y:rows.map(r=>parseFloat(r[yc])),mode,type:'scatter',name:String(g),line:{color:COLORS[i%COLORS.length]}};
+    });
+  } else {
+    const rows=[...figData.data].sort((a,b)=>parseFloat(a[xc])-parseFloat(b[xc]));
+    traces=[{x:rows.map(r=>parseFloat(r[xc])),y:rows.map(r=>parseFloat(r[yc])),mode,type:'scatter',line:{color:COLORS[0]}}];
+  }
+  Plotly.newPlot('fig-chart',traces,_LAY({xaxis:{title:xc},yaxis:{title:yc}}),PLOTLY_CFG);
+  $('fig-description').innerHTML=`<strong>Line chart</strong> — <em>${xc}</em> vs <em>${yc}</em>${grp?` by <em>${grp}</em>`:''}.`;
+}
+
+// ── 6. Q-Q Plot ───────────────────────────────────────────────────────
+function figQQ() {
+  const col=$('fig-qq-col').value, dist=$('fig-qq-dist').value;
+  let raw=_fcol(col).slice().sort((a,b)=>a-b);
+  if (dist==='lognormal') raw=raw.filter(v=>v>0).map(v=>Math.log(v));
+  const n=raw.length;
+  const theo=Array.from({length:n},(_,i)=>_qnorm((i+0.5)/n));
+  const {slope,intercept}=_linreg(theo,raw);
+  Plotly.newPlot('fig-chart',[
+    {x:theo,y:raw,mode:'markers',type:'scatter',name:'Observed',marker:{color:COLORS[0],size:6}},
+    {x:[theo[0],theo[n-1]],y:[slope*theo[0]+intercept,slope*theo[n-1]+intercept],
+      mode:'lines',type:'scatter',name:'Reference line',line:{color:COLORS[2],dash:'dash'}},
+  ],_LAY({xaxis:{title:`Theoretical quantiles (${dist==='lognormal'?'log-':''}Normal)`},
+    yaxis:{title:dist==='lognormal'?`log(${col})`:col}}),PLOTLY_CFG);
+  $('fig-description').innerHTML=`<strong>Q-Q Plot</strong> — <em>${col}</em> vs ${dist==='lognormal'?'log-':''}normal. Points following the reference line suggest normality.`;
+}
+
+// ── 7. Bland-Altman ───────────────────────────────────────────────────
+function figBland() {
+  const m1=$('fig-ba-m1').value, m2=$('fig-ba-m2').value;
+  const pairs=figData.data.map(r=>[parseFloat(r[m1]),parseFloat(r[m2])]).filter(([a,b])=>!isNaN(a)&&!isNaN(b));
+  const means=pairs.map(([a,b])=>(a+b)/2), diffs=pairs.map(([a,b])=>a-b);
+  const bias=_fmean(diffs), sd=_fsd(diffs);
+  const hi=bias+1.96*sd, lo=bias-1.96*sd;
+  const xr=[Math.min(...means),Math.max(...means)];
+  const hline=(y,color,name,dash='dash')=>({x:xr,y:[y,y],mode:'lines',type:'scatter',name,line:{color,dash}});
+  const traces=[
+    {x:means,y:diffs,mode:'markers',type:'scatter',name:'Difference',marker:{color:COLORS[0],size:7}},
+    hline(bias,COLORS[3],`Bias = ${bias.toFixed(3)}`,'solid'),
+  ];
+  if ($('fig-ba-loa').checked) {
+    traces.push(hline(hi,COLORS[2],`+1.96 SD = ${hi.toFixed(3)}`));
+    traces.push(hline(lo,COLORS[2],`−1.96 SD = ${lo.toFixed(3)}`));
+  }
+  Plotly.newPlot('fig-chart',traces,_LAY({xaxis:{title:`Mean of ${m1} & ${m2}`},yaxis:{title:`${m1} − ${m2}`}}),PLOTLY_CFG);
+  $('fig-description').innerHTML=`<strong>Bland-Altman plot</strong> — Bias: ${bias.toFixed(3)}, LoA: [${lo.toFixed(3)}, ${hi.toFixed(3)}].`;
+}
+
+// ── 8. Correlation Heatmap ────────────────────────────────────────────
+function figHeatmap() {
+  const sel=$('fig-heat-cols'), names=[...sel.selectedOptions].map(o=>o.value);
+  if (names.length<2) { alert('Select at least 2 columns.'); return; }
+  const method=$('fig-heat-method').value, corrFn=method==='spearman'?_spearman:_pearson;
+  const cols=names.map(c=>figData.data.map(r=>parseFloat(r[c])));
+  const matrix=names.map((_,i)=>names.map((_,j)=>{
+    const xs=[],ys=[];
+    cols[i].forEach((v,k)=>{if(!isNaN(v)&&!isNaN(cols[j][k])){xs.push(v);ys.push(cols[j][k]);}});
+    return xs.length>1?corrFn(xs,ys):0;
+  }));
+  Plotly.newPlot('fig-chart',[{
+    z:matrix,x:names,y:names,type:'heatmap',colorscale:'RdBu',zmin:-1,zmax:1,
+    text:matrix.map(row=>row.map(v=>v.toFixed(2))),texttemplate:'%{text}',textfont:{size:11},
+    colorbar:{title:'r'},
+  }],_LAY({margin:{t:30,r:20,b:100,l:100}}),PLOTLY_CFG);
+  $('fig-description').innerHTML=`<strong>Correlation heatmap</strong> (${method==='spearman'?'Spearman':'Pearson'} r) across ${names.length} columns.`;
+}
+
+// ── 9. Waterfall Plot ─────────────────────────────────────────────────
+function figWaterfall() {
+  const labelCol=$('fig-wf-label').value, valCol=$('fig-wf-val').value, sort=$('fig-wf-sort').value;
+  let rows=figData.data.map(r=>({label:String(r[labelCol]??''),value:parseFloat(r[valCol])})).filter(r=>!isNaN(r.value));
+  if (sort==='asc') rows.sort((a,b)=>a.value-b.value);
+  else if (sort==='desc') rows.sort((a,b)=>b.value-a.value);
+  Plotly.newPlot('fig-chart',[{
+    x:rows.map(r=>r.label), y:rows.map(r=>r.value), type:'bar',
+    marker:{color:rows.map(r=>r.value<0?COLORS[1]:COLORS[2])},
+    text:rows.map(r=>`${r.value>0?'+':''}${r.value.toFixed(1)}`),
+    textposition:rows.map(r=>r.value>=0?'outside':'inside'),
+  }],_LAY({xaxis:{title:labelCol,tickangle:-45},
+    yaxis:{title:valCol,zeroline:true,zerolinecolor:'#374151',zerolinewidth:2},bargap:0.1}),PLOTLY_CFG);
+  $('fig-description').innerHTML=`<strong>Waterfall plot</strong> — <em>${valCol}</em> per <em>${labelCol}</em>. Green = decrease, red = increase.`;
 }
 
 // Math.erf polyfill for power curve

@@ -99,6 +99,15 @@
     .upload-zone:hover, .upload-zone.drag-over { border-color: var(--primary); background: #eff6ff; }
     .upload-zone i { font-size: 2rem; color: #94a3b8; }
 
+    /* ── Sheet picker ────────────────────────────── */
+    .sheet-picker { font-size: .82rem; }
+    .sheet-picker .sheet-btn { font-size: .78rem; padding: .2rem .55rem; }
+
+    /* ── Figures ─────────────────────────────────── */
+    .fig-opts { display: none; }
+    .fig-opts.active { display: block; }
+    #fig-description { color: var(--muted); line-height: 1.6; }
+
     /* ── Results ─────────────────────────────────── */
     .results-area { display: none; }
     .results-area.show { display: block; }
@@ -207,6 +216,11 @@
       <li class="nav-item">
         <a class="nav-link" data-section="biomarker" href="#">
           <i class="bi bi-thermometer-half"></i> Biomarker Analysis
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-section="figures" href="#">
+          <i class="bi bi-bar-chart-line"></i> Figures
         </a>
       </li>
     </ul>
@@ -818,6 +832,162 @@ Jones 2021,38,98,22,102</span>
           <i class="bi bi-thermometer-half" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Load data and run</p>
         </div>
       </div>
+    </div>
+  </div>
+
+
+  <!-- ─── FIGURES ─── -->
+  <div id="section-figures" class="section">
+    <div class="page-header">
+      <h4><i class="bi bi-bar-chart-line me-2 text-primary"></i>Statistical Figures</h4>
+      <p>Common charts for medical research publications — histogram, box/violin, bar, scatter, line, Q-Q, Bland-Altman, correlation heatmap, waterfall</p>
+    </div>
+    <div class="row g-3">
+
+      <!-- Left: data + config -->
+      <div class="col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">Data Source</div>
+          <div class="card-body">
+            <div class="upload-zone" id="fig-upload-zone">
+              <input type="file" id="fig-file" accept=".csv,.xlsx,.xls" style="display:none">
+              <i class="bi bi-cloud-upload d-block mb-2"></i>
+              <div class="fw-semibold">Drop file or click to browse</div>
+              <small class="text-muted">CSV or Excel (.xlsx)</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="fig-config-card" style="display:none">
+          <div class="card-header">Figure Options</div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label fw-semibold" style="font-size:.8rem">Figure type</label>
+              <select class="form-select form-select-sm" id="fig-type">
+                <option value="histogram">Histogram</option>
+                <option value="box">Box / Violin Plot</option>
+                <option value="bar">Bar Chart (mean ± error)</option>
+                <option value="scatter">Scatter Plot</option>
+                <option value="line">Line Chart</option>
+                <option value="qq">Q-Q Plot</option>
+                <option value="bland">Bland-Altman Plot</option>
+                <option value="heatmap">Correlation Heatmap</option>
+                <option value="waterfall">Waterfall Plot</option>
+              </select>
+            </div>
+
+            <!-- Histogram -->
+            <div class="fig-opts active" id="opts-histogram">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Column</label><select class="form-select form-select-sm" id="fig-hist-col"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Group by <span class="text-muted">(optional)</span></label><select class="form-select form-select-sm" id="fig-hist-grp"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Bins</label><input type="number" class="form-control form-control-sm" id="fig-hist-bins" value="20" min="2" max="200"></div>
+              <div class="mb-1"><label class="form-label fw-semibold" style="font-size:.8rem">Opacity <span id="fig-hist-opacity-val" class="text-muted">0.7</span></label><input type="range" class="form-range" id="fig-hist-opacity" min="0.1" max="1" step="0.1" value="0.7"></div>
+            </div>
+
+            <!-- Box / Violin -->
+            <div class="fig-opts" id="opts-box">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Value column</label><select class="form-select form-select-sm" id="fig-box-val"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Group by <span class="text-muted">(optional)</span></label><select class="form-select form-select-sm" id="fig-box-grp"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Plot type</label>
+                <select class="form-select form-select-sm" id="fig-box-type">
+                  <option value="box">Box plot</option>
+                  <option value="violin">Violin plot</option>
+                </select>
+              </div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="fig-box-points" checked><label class="form-check-label" style="font-size:.82rem">Show individual points</label></div>
+            </div>
+
+            <!-- Bar chart -->
+            <div class="fig-opts" id="opts-bar">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Value column (numeric)</label><select class="form-select form-select-sm" id="fig-bar-val"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Group column</label><select class="form-select form-select-sm" id="fig-bar-grp"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Error bars</label>
+                <select class="form-select form-select-sm" id="fig-bar-err">
+                  <option value="sd">± SD</option>
+                  <option value="sem">± SEM</option>
+                  <option value="ci95">± 95% CI</option>
+                  <option value="none">None</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Scatter -->
+            <div class="fig-opts" id="opts-scatter">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">X column</label><select class="form-select form-select-sm" id="fig-scat-x"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Y column</label><select class="form-select form-select-sm" id="fig-scat-y"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Color by <span class="text-muted">(optional)</span></label><select class="form-select form-select-sm" id="fig-scat-grp"></select></div>
+              <div class="form-check mb-1"><input class="form-check-input" type="checkbox" id="fig-scat-reg"><label class="form-check-label" style="font-size:.82rem">Regression line</label></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="fig-scat-ci"><label class="form-check-label" style="font-size:.82rem">95% confidence band</label></div>
+            </div>
+
+            <!-- Line chart -->
+            <div class="fig-opts" id="opts-line">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">X column</label><select class="form-select form-select-sm" id="fig-line-x"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Y column</label><select class="form-select form-select-sm" id="fig-line-y"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Group by <span class="text-muted">(optional)</span></label><select class="form-select form-select-sm" id="fig-line-grp"></select></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="fig-line-pts" checked><label class="form-check-label" style="font-size:.82rem">Show markers</label></div>
+            </div>
+
+            <!-- Q-Q plot -->
+            <div class="fig-opts" id="opts-qq">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Column</label><select class="form-select form-select-sm" id="fig-qq-col"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Reference distribution</label>
+                <select class="form-select form-select-sm" id="fig-qq-dist">
+                  <option value="normal">Normal</option>
+                  <option value="lognormal">Log-Normal</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Bland-Altman -->
+            <div class="fig-opts" id="opts-bland">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Method 1 column</label><select class="form-select form-select-sm" id="fig-ba-m1"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Method 2 column</label><select class="form-select form-select-sm" id="fig-ba-m2"></select></div>
+              <div class="form-check"><input class="form-check-input" type="checkbox" id="fig-ba-loa" checked><label class="form-check-label" style="font-size:.82rem">Show limits of agreement (±1.96 SD)</label></div>
+            </div>
+
+            <!-- Heatmap -->
+            <div class="fig-opts" id="opts-heatmap">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Columns <span class="text-muted">(select ≥ 2)</span></label><select class="form-select form-select-sm" id="fig-heat-cols" multiple style="min-height:7rem"></select></div>
+              <div class="mb-1"><label class="form-label fw-semibold" style="font-size:.8rem">Method</label>
+                <select class="form-select form-select-sm" id="fig-heat-method">
+                  <option value="pearson">Pearson</option>
+                  <option value="spearman">Spearman</option>
+                </select>
+              </div>
+              <small class="text-muted">Ctrl/Cmd+click to select multiple</small>
+            </div>
+
+            <!-- Waterfall -->
+            <div class="fig-opts" id="opts-waterfall">
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Label column</label><select class="form-select form-select-sm" id="fig-wf-label"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Value column (numeric)</label><select class="form-select form-select-sm" id="fig-wf-val"></select></div>
+              <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Sort</label>
+                <select class="form-select form-select-sm" id="fig-wf-sort">
+                  <option value="asc">Ascending</option>
+                  <option value="desc">Descending</option>
+                  <option value="none">Original order</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+        </div>
+        <button class="btn btn-primary btn-run w-100 mt-2" id="fig-plot-btn" style="display:none"><i class="bi bi-play-fill me-1"></i> Plot</button>
+      </div>
+
+      <!-- Right: chart output -->
+      <div class="col-lg-8">
+        <div id="fig-placeholder" class="text-center text-muted mt-5 pt-5">
+          <i class="bi bi-bar-chart-line" style="font-size:3rem;opacity:.3"></i>
+          <p class="mt-2">Load data and select a figure type to begin</p>
+        </div>
+        <div id="fig-chart-area" style="display:none">
+          <div class="card mb-2"><div class="card-body p-2"><div class="plot-container" id="fig-chart" style="min-height:420px"></div></div></div>
+          <div class="card"><div class="card-body" id="fig-description"></div></div>
+        </div>
+      </div>
+
     </div>
   </div>
 
