@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedStat — Medical Research Statistics</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <style>
+    :root {
+      --sidebar-w: 230px;
+      --primary: #1d4ed8;
+      --primary-dark: #1e3a8a;
+      --accent: #06b6d4;
+      --success: #16a34a;
+      --danger: #dc2626;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: #1f2937; }
+
+    /* ── Sidebar ─────────────────────────────────── */
+    #sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--primary-dark);
+      color: #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+      overflow-y: auto;
+    }
+    #sidebar .brand {
+      padding: 1.25rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    #sidebar .brand h5 { margin: 0; font-weight: 700; color: #fff; font-size: 1.1rem; letter-spacing: .03em; }
+    #sidebar .brand small { color: #94a3b8; font-size: .72rem; }
+    #sidebar nav { flex: 1; padding: .5rem 0; }
+    #sidebar .nav-item { padding: 0; }
+    #sidebar .nav-link {
+      display: flex; align-items: center; gap: .55rem;
+      padding: .65rem 1rem;
+      color: #cbd5e1;
+      border-radius: 0;
+      font-size: .875rem;
+      transition: background .15s, color .15s;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+    }
+    #sidebar .nav-link:hover { background: rgba(255,255,255,.07); color: #fff; }
+    #sidebar .nav-link.active { background: rgba(6,182,212,.15); color: #67e8f9; border-left-color: var(--accent); }
+    #sidebar .nav-link i { font-size: 1rem; width: 1.2rem; text-align: center; }
+    #sidebar .api-link {
+      padding: .75rem 1rem;
+      border-top: 1px solid rgba(255,255,255,.1);
+      font-size: .75rem;
+    }
+    #sidebar .api-link a { color: #94a3b8; text-decoration: none; }
+    #sidebar .api-link a:hover { color: #e2e8f0; }
+
+    /* ── Main content ────────────────────────────── */
+    #app { margin-left: var(--sidebar-w); min-height: 100vh; }
+
+    .section { display: none; padding: 1.5rem 2rem; }
+    .section.active { display: block; }
+
+    .page-header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: .75rem;
+      margin-bottom: 1.5rem;
+    }
+    .page-header h4 { margin: 0; font-weight: 700; }
+    .page-header p { margin: .25rem 0 0; color: var(--muted); font-size: .875rem; }
+
+    /* ── Cards ───────────────────────────────────── */
+    .card { border: 1px solid var(--border); border-radius: 10px; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+    .card-header { border-bottom: 1px solid var(--border); background: #f1f5f9; border-radius: 10px 10px 0 0 !important; font-weight: 600; font-size: .875rem; padding: .65rem 1rem; }
+
+    /* ── Data source tabs ────────────────────────── */
+    .data-source-tabs .nav-link { font-size: .82rem; padding: .35rem .8rem; }
+    .data-pane { display: none; }
+    .data-pane.active { display: block; }
+
+    /* ── Upload zone ─────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed #cbd5e1;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--primary); background: #eff6ff; }
+    .upload-zone i { font-size: 2rem; color: #94a3b8; }
+
+    /* ── Results ─────────────────────────────────── */
+    .results-area { display: none; }
+    .results-area.show { display: block; }
+
+    .stat-badge {
+      display: inline-block;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 6px;
+      padding: .3rem .7rem;
+      font-size: .82rem;
+      font-weight: 600;
+      color: #1d4ed8;
+    }
+    .stat-badge.success { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+    .stat-badge.danger  { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+
+    .plot-container { min-height: 420px; }
+
+    /* ── Manual table ────────────────────────────── */
+    .manual-table-wrap { overflow-x: auto; max-height: 320px; }
+    .manual-table td input { border: none; background: transparent; width: 100%; min-width: 80px; }
+    .manual-table td input:focus { outline: 1px solid var(--primary); border-radius: 2px; }
+
+    /* ── Study rows for meta-analysis ───────────── */
+    .study-row { background: #f8fafc; border: 1px solid var(--border); border-radius: 6px; padding: .6rem .8rem; margin-bottom: .4rem; }
+
+    /* ── Spinner ─────────────────────────────────── */
+    .btn-run { min-width: 120px; }
+    .btn-run .spinner-border { width: 1rem; height: 1rem; border-width: 2px; }
+
+    /* ── p-value highlight ───────────────────────── */
+    .p-sig   { color: var(--success); font-weight: 600; }
+    .p-insig { color: var(--danger); font-weight: 600; }
+
+    /* ── Responsive table ────────────────────────── */
+    .table-sm td, .table-sm th { padding: .35rem .6rem; font-size: .82rem; }
+
+    /* ── 2x2 grid ────────────────────────────────── */
+    .two-by-two-grid input {
+      width: 80px; text-align: center; font-size: 1.2rem; font-weight: 600;
+      border: 2px solid #e5e7eb; border-radius: 6px; padding: .3rem;
+    }
+    .two-by-two-grid input:focus { border-color: var(--primary); outline: none; }
+    .two-by-two-grid .cell-label { font-size: .72rem; color: var(--muted); margin-bottom: 2px; }
+
+    /* ── Format hint ─────────────────────────────── */
+    .format-hint {
+      background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
+      padding: .5rem .75rem; font-size: .76rem; color: #0369a1;
+      margin-bottom: .75rem; line-height: 1.5;
+    }
+    .format-hint code {
+      background: #e0f2fe; border-radius: 3px; padding: .05rem .3rem;
+      font-size: .74rem; color: #0c4a6e;
+    }
+    .format-hint .example {
+      font-family: monospace; background: #e0f2fe; border-radius: 4px;
+      padding: .25rem .5rem; margin-top: .35rem; display: block;
+      white-space: pre; font-size: .72rem; color: #075985;
+    }
+
+    /* ── Data preview modal ──────────────────────── */
+    .col-toggle {
+      display: inline-flex; align-items: center;
+      background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 4px;
+      padding: .15rem .55rem; font-size: .78rem; cursor: pointer;
+      user-select: none; transition: background .12s, color .12s;
+    }
+    .col-toggle:hover { background: #dbeafe; }
+    .col-toggle.excluded { background: #f9fafb; border-color: #e5e7eb; color: #9ca3af; text-decoration: line-through; }
+    #preview-table thead th { position: sticky; top: 0; background: #f1f5f9; z-index: 1; font-weight: 600; }
+    .preview-data-btn { font-size: .78rem; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ SIDEBAR ═══════════════ -->
+<div id="sidebar">
+  <div class="brand">
+    <h5><i class="bi bi-activity me-2" style="color:#67e8f9"></i>MedStat</h5>
+    <small>Medical Research Statistics</small>
+  </div>
+  <nav>
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link active" data-section="survival" href="#">
+          <i class="bi bi-graph-up-arrow"></i> Survival Analysis
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-section="meta" href="#">
+          <i class="bi bi-diagram-3"></i> Meta-Analysis
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-section="clinical" href="#">
+          <i class="bi bi-clipboard2-pulse"></i> Clinical Trials
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-section="epi" href="#">
+          <i class="bi bi-people"></i> Epidemiology
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-section="biomarker" href="#">
+          <i class="bi bi-thermometer-half"></i> Biomarker Analysis
+        </a>
+      </li>
+    </ul>
+  </nav>
+  <div class="api-link"><a href="/api/docs" target="_blank"><i class="bi bi-code-slash me-1"></i>API Docs</a></div>
+</div>
+
+<!-- ═══════════════ MAIN CONTENT ═══════════════ -->
+<div id="app">
+
+  <!-- ─── SURVIVAL ─── -->
+  <div id="section-survival" class="section active">
+    <div class="page-header">
+      <h4><i class="bi bi-graph-up-arrow me-2 text-primary"></i>Survival Analysis</h4>
+      <p>Kaplan-Meier curves with optional group comparison (log-rank test)</p>
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <div class="card mb-3">
+          <div class="card-header">Data Input</div>
+          <div class="card-body">
+            <ul class="nav nav-tabs data-source-tabs mb-3" id="surv-tabs">
+              <li class="nav-item"><a class="nav-link active" data-pane="surv-csv" href="#">CSV/Excel</a></li>
+              <li class="nav-item"><a class="nav-link" data-pane="surv-manual" href="#">Manual Entry</a></li>
+              <li class="nav-item"><a class="nav-link" data-pane="surv-redcap" href="#">REDCap</a></li>
+            </ul>
+
+            <!-- CSV pane -->
+            <div class="data-pane active" id="surv-csv">
+              <div class="format-hint">
+                <i class="bi bi-info-circle me-1"></i><strong>Required columns:</strong>
+                <code>time</code> numeric follow-up duration &nbsp;·&nbsp;
+                <code>event</code> 0 = censored, 1 = event &nbsp;·&nbsp;
+                <code>group</code> optional group label
+                <span class="example">time,event,group
+12.5,1,Treatment
+8.0,0,Control
+24.1,1,Treatment</span>
+              </div>
+              <div class="upload-zone" id="surv-upload-zone">
+                <input type="file" id="surv-file" accept=".csv,.xlsx,.xls" style="display:none">
+                <i class="bi bi-cloud-upload d-block mb-2"></i>
+                <div class="fw-semibold">Drop file or click to browse</div>
+                <small class="text-muted">CSV or Excel (.xlsx)</small>
+              </div>
+              <div id="surv-col-map" class="mt-3" style="display:none">
+                <div class="row g-2">
+                  <div class="col-6">
+                    <label class="form-label fw-semibold" style="font-size:.8rem">Time column</label>
+                    <select class="form-select form-select-sm" id="surv-col-time"></select>
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label fw-semibold" style="font-size:.8rem">Event column (0/1)</label>
+                    <select class="form-select form-select-sm" id="surv-col-event"></select>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label fw-semibold" style="font-size:.8rem">Group column <span class="text-muted">(optional)</span></label>
+                    <select class="form-select form-select-sm" id="surv-col-group"><option value="">— none —</option></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Manual pane -->
+            <div class="data-pane" id="surv-manual">
+              <p class="text-muted" style="font-size:.8rem">Enter observations (one per row). Group is optional.</p>
+              <div class="manual-table-wrap">
+                <table class="table table-sm table-bordered manual-table" id="surv-manual-table">
+                  <thead><tr><th>Time</th><th>Event (0/1)</th><th>Group</th></tr></thead>
+                  <tbody id="surv-manual-body"></tbody>
+                </table>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary mt-1" id="surv-add-row"><i class="bi bi-plus"></i> Add row</button>
+            </div>
+
+            <!-- REDCap pane -->
+            <div class="data-pane" id="surv-redcap">
+              <div class="mb-2">
+                <label class="form-label fw-semibold" style="font-size:.8rem">REDCap API URL</label>
+                <input type="url" class="form-control form-control-sm" id="surv-rc-url" placeholder="https://redcap.example.org/api/">
+              </div>
+              <div class="mb-2">
+                <label class="form-label fw-semibold" style="font-size:.8rem">API Token</label>
+                <input type="password" class="form-control form-control-sm" id="surv-rc-token" placeholder="32-character token">
+              </div>
+              <div class="mb-2">
+                <label class="form-label fw-semibold" style="font-size:.8rem">Label format</label>
+                <select class="form-select form-select-sm" id="surv-rc-format">
+                  <option value="label">Labels (human-readable)</option>
+                  <option value="raw">Raw codes</option>
+                </select>
+              </div>
+              <button class="btn btn-sm btn-outline-primary w-100" id="surv-rc-fetch">
+                <i class="bi bi-cloud-download me-1"></i>Fetch from REDCap
+              </button>
+              <div id="surv-rc-status" class="mt-2" style="font-size:.8rem"></div>
+              <div id="surv-rc-col-map" class="mt-3" style="display:none">
+                <div class="row g-2">
+                  <div class="col-6">
+                    <label class="form-label fw-semibold" style="font-size:.8rem">Time column</label>
+                    <select class="form-select form-select-sm" id="surv-rc-col-time"></select>
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label fw-semibold" style="font-size:.8rem">Event column (0/1)</label>
+                    <select class="form-select form-select-sm" id="surv-rc-col-event"></select>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label fw-semibold" style="font-size:.8rem">Group column <span class="text-muted">(optional)</span></label>
+                    <select class="form-select form-select-sm" id="surv-rc-col-group"><option value="">— none —</option></select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-run w-100" id="surv-run">
+          <i class="bi bi-play-fill me-1"></i> Run Analysis
+        </button>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="results-area" id="surv-results">
+          <div class="card mb-3">
+            <div class="card-header">Kaplan-Meier Curve</div>
+            <div class="card-body p-2"><div class="plot-container" id="surv-plot"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header">Summary Statistics</div>
+            <div class="card-body" id="surv-stats"></div>
+          </div>
+        </div>
+        <div id="surv-placeholder" class="text-center text-muted mt-5 pt-5">
+          <i class="bi bi-graph-up-arrow" style="font-size:3rem;opacity:.3"></i>
+          <p class="mt-2">Load data and click Run Analysis</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── META-ANALYSIS ─── -->
+  <div id="section-meta" class="section">
+    <div class="page-header">
+      <h4><i class="bi bi-diagram-3 me-2 text-primary"></i>Meta-Analysis</h4>
+      <p>Fixed &amp; random effects models, forest plot, funnel plot, heterogeneity</p>
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-5">
+        <div class="card mb-3">
+          <div class="card-header">Studies</div>
+          <div class="card-body">
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label fw-semibold" style="font-size:.8rem">Effect Measure</label>
+                <select class="form-select form-select-sm" id="meta-measure">
+                  <option value="OR">Odds Ratio (OR)</option>
+                  <option value="RR">Risk Ratio (RR)</option>
+                  <option value="MD">Mean Difference (MD)</option>
+                  <option value="SMD">Std Mean Diff (SMD)</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-semibold" style="font-size:.8rem">Model</label>
+                <select class="form-select form-select-sm" id="meta-model">
+                  <option value="random">Random Effects (DL)</option>
+                  <option value="fixed">Fixed Effects (IV)</option>
+                </select>
+              </div>
+            </div>
+
+            <ul class="nav nav-tabs data-source-tabs mb-3" id="meta-tabs">
+              <li class="nav-item"><a class="nav-link active" data-pane="meta-csv" href="#">CSV/Excel</a></li>
+              <li class="nav-item"><a class="nav-link" data-pane="meta-manual" href="#">Manual Entry</a></li>
+            </ul>
+
+            <div class="data-pane active" id="meta-csv">
+              <div class="format-hint">
+                <i class="bi bi-info-circle me-1"></i><strong>Required columns (2×2 counts):</strong>
+                <code>name</code> study label &nbsp;·&nbsp;
+                <code>events_1</code> <code>n_1</code> treatment arm &nbsp;·&nbsp;
+                <code>events_2</code> <code>n_2</code> control arm
+                <span class="example">name,events_1,n_1,events_2,n_2
+Smith 2020,45,120,30,115
+Jones 2021,38,98,22,102</span>
+              </div>
+              <div class="upload-zone" id="meta-upload-zone">
+                <input type="file" id="meta-file" accept=".csv,.xlsx,.xls" style="display:none">
+                <i class="bi bi-cloud-upload d-block mb-2"></i>
+                <div class="fw-semibold">Drop file or click to browse</div>
+                <small class="text-muted">Columns: name, events_1, n_1, events_2, n_2 <br>or name, effect, lower_ci, upper_ci</small>
+              </div>
+              <div id="meta-col-map" class="mt-3" style="display:none">
+                <div class="row g-2">
+                  <div class="col-12"><label class="form-label fw-semibold" style="font-size:.8rem">Study name</label><select class="form-select form-select-sm" id="meta-col-name"></select></div>
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">Events (group 1)</label><select class="form-select form-select-sm" id="meta-col-e1"></select></div>
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">N (group 1)</label><select class="form-select form-select-sm" id="meta-col-n1"></select></div>
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">Events (group 2)</label><select class="form-select form-select-sm" id="meta-col-e2"></select></div>
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">N (group 2)</label><select class="form-select form-select-sm" id="meta-col-n2"></select></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="data-pane" id="meta-manual">
+              <p class="text-muted" style="font-size:.8rem">Enter each study's 2x2 counts.</p>
+              <div id="meta-studies"></div>
+              <button class="btn btn-sm btn-outline-secondary mt-2" id="meta-add-study"><i class="bi bi-plus"></i> Add Study</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-run w-100" id="meta-run">
+          <i class="bi bi-play-fill me-1"></i> Run Meta-Analysis
+        </button>
+      </div>
+
+      <div class="col-lg-7">
+        <div class="results-area" id="meta-results">
+          <div class="card mb-3">
+            <div class="card-header">Forest Plot</div>
+            <div class="card-body p-2"><div class="plot-container" id="meta-forest-plot"></div></div>
+          </div>
+          <div class="card mb-3">
+            <div class="card-header">Funnel Plot</div>
+            <div class="card-body p-2"><div style="min-height:300px" id="meta-funnel-plot"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header">Heterogeneity &amp; Summary</div>
+            <div class="card-body" id="meta-stats"></div>
+          </div>
+        </div>
+        <div id="meta-placeholder" class="text-center text-muted mt-5 pt-5">
+          <i class="bi bi-diagram-3" style="font-size:3rem;opacity:.3"></i>
+          <p class="mt-2">Add studies and click Run Meta-Analysis</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── CLINICAL ─── -->
+  <div id="section-clinical" class="section">
+    <div class="page-header">
+      <h4><i class="bi bi-clipboard2-pulse me-2 text-primary"></i>Clinical Trials</h4>
+      <p>t-tests, ANOVA, chi-square / Fisher's exact, power &amp; sample size calculator</p>
+    </div>
+    <ul class="nav nav-pills mb-3" id="clinical-sub-tabs">
+      <li class="nav-item"><a class="nav-link active" data-clinical="ttest" href="#">t-test</a></li>
+      <li class="nav-item"><a class="nav-link" data-clinical="anova" href="#">ANOVA</a></li>
+      <li class="nav-item"><a class="nav-link" data-clinical="chisq" href="#">Chi-Square</a></li>
+      <li class="nav-item"><a class="nav-link" data-clinical="power" href="#">Sample Size</a></li>
+    </ul>
+
+    <!-- t-test -->
+    <div id="clinical-ttest" class="clinical-pane">
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="card mb-3">
+            <div class="card-header">Options</div>
+            <div class="card-body">
+              <ul class="nav nav-tabs data-source-tabs mb-3" id="ttest-tabs">
+                <li class="nav-item"><a class="nav-link active" data-pane="ttest-csv" href="#">CSV/Excel</a></li>
+                <li class="nav-item"><a class="nav-link" data-pane="ttest-manual" href="#">Manual</a></li>
+              </ul>
+              <div class="data-pane active" id="ttest-csv">
+                <div class="format-hint">
+                  <i class="bi bi-info-circle me-1"></i><strong>Required columns:</strong>
+                  one <code>numeric outcome</code> column + one <code>group</code> column with exactly 2 distinct values
+                  <span class="example">sbp,treatment
+142,Drug A
+138,Drug A
+155,Placebo
+149,Placebo</span>
+                </div>
+                <div class="upload-zone" id="ttest-upload-zone">
+                  <input type="file" id="ttest-file" accept=".csv,.xlsx,.xls" style="display:none">
+                  <i class="bi bi-cloud-upload d-block mb-2"></i>
+                  <div class="fw-semibold">Drop file or click</div>
+                </div>
+                <div id="ttest-col-map" style="display:none" class="mt-2 row g-2">
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">Outcome</label><select class="form-select form-select-sm" id="ttest-col-outcome"></select></div>
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">Group</label><select class="form-select form-select-sm" id="ttest-col-group"></select></div>
+                </div>
+              </div>
+              <div class="data-pane" id="ttest-manual">
+                <div class="mb-2">
+                  <label class="form-label fw-semibold" style="font-size:.8rem">Group 1 values (comma-separated)</label>
+                  <textarea class="form-control form-control-sm" id="ttest-g1" rows="3" placeholder="e.g. 12, 15, 14, 11"></textarea>
+                </div>
+                <div>
+                  <label class="form-label fw-semibold" style="font-size:.8rem">Group 2 values</label>
+                  <textarea class="form-control form-control-sm" id="ttest-g2" rows="3" placeholder="e.g. 9, 10, 8, 11"></textarea>
+                </div>
+              </div>
+              <hr class="my-2">
+              <div class="form-check form-switch mb-1">
+                <input class="form-check-input" type="checkbox" id="ttest-paired">
+                <label class="form-check-label" style="font-size:.85rem" for="ttest-paired">Paired t-test</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="ttest-equalvar">
+                <label class="form-check-label" style="font-size:.85rem" for="ttest-equalvar">Assume equal variance</label>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-run w-100" id="ttest-run"><i class="bi bi-play-fill me-1"></i> Run t-test</button>
+        </div>
+        <div class="col-lg-8">
+          <div class="results-area" id="ttest-results">
+            <div class="card mb-3"><div class="card-header">Distribution Plot</div><div class="card-body p-2"><div style="min-height:350px" id="ttest-plot"></div></div></div>
+            <div class="card"><div class="card-header">Results</div><div class="card-body" id="ttest-stats"></div></div>
+          </div>
+          <div id="ttest-placeholder" class="text-center text-muted mt-5 pt-5">
+            <i class="bi bi-bar-chart" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Enter data and run</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANOVA -->
+    <div id="clinical-anova" class="clinical-pane" style="display:none">
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="card mb-3">
+            <div class="card-header">Groups</div>
+            <div class="card-body">
+              <ul class="nav nav-tabs data-source-tabs mb-3" id="anova-tabs">
+                <li class="nav-item"><a class="nav-link active" data-pane="anova-csv" href="#">CSV/Excel</a></li>
+                <li class="nav-item"><a class="nav-link" data-pane="anova-manual" href="#">Manual</a></li>
+              </ul>
+              <div class="data-pane active" id="anova-csv">
+                <div class="format-hint">
+                  <i class="bi bi-info-circle me-1"></i><strong>Required columns:</strong>
+                  one <code>numeric outcome</code> column + one <code>group</code> column with 3 or more distinct values
+                  <span class="example">score,dose
+88,Low
+76,Medium
+95,High</span>
+                </div>
+                <div class="upload-zone" id="anova-upload-zone">
+                  <input type="file" id="anova-file" accept=".csv,.xlsx,.xls" style="display:none">
+                  <i class="bi bi-cloud-upload d-block mb-2"></i><div class="fw-semibold">Drop file or click</div>
+                </div>
+                <div id="anova-col-map" style="display:none" class="mt-2 row g-2">
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">Outcome</label><select class="form-select form-select-sm" id="anova-col-outcome"></select></div>
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">Group</label><select class="form-select form-select-sm" id="anova-col-group"></select></div>
+                </div>
+              </div>
+              <div class="data-pane" id="anova-manual">
+                <div id="anova-groups-manual"></div>
+                <button class="btn btn-sm btn-outline-secondary mt-2" id="anova-add-group"><i class="bi bi-plus"></i> Add Group</button>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-run w-100" id="anova-run"><i class="bi bi-play-fill me-1"></i> Run ANOVA</button>
+        </div>
+        <div class="col-lg-8">
+          <div class="results-area" id="anova-results">
+            <div class="card mb-3"><div class="card-header">Box Plot</div><div class="card-body p-2"><div style="min-height:350px" id="anova-plot"></div></div></div>
+            <div class="card"><div class="card-header">ANOVA Table &amp; Post-hoc</div><div class="card-body" id="anova-stats"></div></div>
+          </div>
+          <div id="anova-placeholder" class="text-center text-muted mt-5 pt-5"><i class="bi bi-bar-chart-line" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Enter data and run</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chi-square -->
+    <div id="clinical-chisq" class="clinical-pane" style="display:none">
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="card mb-3">
+            <div class="card-header">Contingency Table</div>
+            <div class="card-body">
+              <div class="mb-2 d-flex gap-2 align-items-center">
+                <label style="font-size:.85rem">Rows:</label>
+                <input type="number" id="chisq-rows" class="form-control form-control-sm" style="width:60px" value="2" min="2" max="6">
+                <label style="font-size:.85rem">Cols:</label>
+                <input type="number" id="chisq-cols" class="form-control form-control-sm" style="width:60px" value="2" min="2" max="6">
+                <button class="btn btn-sm btn-outline-secondary" id="chisq-build-table">Build</button>
+              </div>
+              <div id="chisq-table-container"></div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-run w-100" id="chisq-run"><i class="bi bi-play-fill me-1"></i> Run Chi-Square</button>
+        </div>
+        <div class="col-lg-8">
+          <div class="results-area" id="chisq-results">
+            <div class="card mb-3"><div class="card-header">Heatmap</div><div class="card-body p-2"><div style="min-height:320px" id="chisq-plot"></div></div></div>
+            <div class="card"><div class="card-header">Results</div><div class="card-body" id="chisq-stats"></div></div>
+          </div>
+          <div id="chisq-placeholder" class="text-center text-muted mt-5 pt-5"><i class="bi bi-grid" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Enter table and run</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Power / Sample Size -->
+    <div id="clinical-power" class="clinical-pane" style="display:none">
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="card mb-3">
+            <div class="card-header">Parameters</div>
+            <div class="card-body">
+              <div class="mb-2">
+                <label class="form-label fw-semibold" style="font-size:.85rem">Test type</label>
+                <select class="form-select form-select-sm" id="power-test">
+                  <option value="ttest_2samp">Two-sample t-test</option>
+                  <option value="proportion_2samp">Two proportions</option>
+                </select>
+              </div>
+              <div class="row g-2 mb-2">
+                <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">α (alpha)</label><input type="number" class="form-control form-control-sm" id="power-alpha" value="0.05" step="0.01" min="0.001" max="0.2"></div>
+                <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">Power (1−β)</label><input type="number" class="form-control form-control-sm" id="power-power" value="0.80" step="0.05" min="0.5" max="0.99"></div>
+              </div>
+              <div id="power-ttest-params">
+                <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Cohen's d (effect size)</label><input type="number" class="form-control form-control-sm" id="power-d" value="0.5" step="0.1" min="0.01"></div>
+                <div class="text-muted" style="font-size:.75rem">Small=0.2 &nbsp;·&nbsp; Medium=0.5 &nbsp;·&nbsp; Large=0.8</div>
+              </div>
+              <div id="power-prop-params" style="display:none">
+                <div class="row g-2">
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">p₁</label><input type="number" class="form-control form-control-sm" id="power-p1" value="0.3" step="0.01" min="0.01" max="0.99"></div>
+                  <div class="col-6"><label class="form-label fw-semibold" style="font-size:.8rem">p₂</label><input type="number" class="form-control form-control-sm" id="power-p2" value="0.5" step="0.01" min="0.01" max="0.99"></div>
+                </div>
+              </div>
+              <div class="mt-2"><label class="form-label fw-semibold" style="font-size:.8rem">Allocation ratio (n₂/n₁)</label><input type="number" class="form-control form-control-sm" id="power-ratio" value="1" step="0.1" min="0.1"></div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-run w-100" id="power-run"><i class="bi bi-calculator me-1"></i> Calculate</button>
+        </div>
+        <div class="col-lg-8">
+          <div class="results-area" id="power-results">
+            <div class="card mb-3"><div class="card-header">Power Curve</div><div class="card-body p-2"><div style="min-height:350px" id="power-plot"></div></div></div>
+            <div class="card"><div class="card-header">Results</div><div class="card-body" id="power-stats"></div></div>
+          </div>
+          <div id="power-placeholder" class="text-center text-muted mt-5 pt-5"><i class="bi bi-calculator" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Set parameters and calculate</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── EPIDEMIOLOGY ─── -->
+  <div id="section-epi" class="section">
+    <div class="page-header">
+      <h4><i class="bi bi-people me-2 text-primary"></i>Epidemiology</h4>
+      <p>2×2 table analysis, OR/RR, logistic regression, incidence rates</p>
+    </div>
+    <ul class="nav nav-pills mb-3" id="epi-sub-tabs">
+      <li class="nav-item"><a class="nav-link active" data-epi="twobytwo" href="#">2×2 Table</a></li>
+      <li class="nav-item"><a class="nav-link" data-epi="logistic" href="#">Logistic Regression</a></li>
+      <li class="nav-item"><a class="nav-link" data-epi="incidence" href="#">Incidence Rate</a></li>
+    </ul>
+
+    <!-- 2x2 -->
+    <div id="epi-twobytwo" class="epi-pane">
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="card mb-3">
+            <div class="card-header">2×2 Contingency Table</div>
+            <div class="card-body">
+              <div class="row g-2 mb-3">
+                <div class="col-6"><label style="font-size:.8rem" class="fw-semibold">Exposure label</label><input type="text" class="form-control form-control-sm" id="epi-exp-name" value="Exposure"></div>
+                <div class="col-6"><label style="font-size:.8rem" class="fw-semibold">Outcome label</label><input type="text" class="form-control form-control-sm" id="epi-out-name" value="Outcome"></div>
+              </div>
+              <table class="table table-bordered table-sm text-center two-by-two-grid">
+                <thead><tr><th></th><th>Outcome +</th><th>Outcome −</th></tr></thead>
+                <tbody>
+                  <tr><th>Exposed</th><td><div class="cell-label">a</div><input type="number" id="epi-a" value="45" min="0"></td><td><div class="cell-label">b</div><input type="number" id="epi-b" value="55" min="0"></td></tr>
+                  <tr><th>Unexposed</th><td><div class="cell-label">c</div><input type="number" id="epi-c" value="30" min="0"></td><td><div class="cell-label">d</div><input type="number" id="epi-d" value="70" min="0"></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-run w-100" id="epi-twobytwo-run"><i class="bi bi-play-fill me-1"></i> Analyse Table</button>
+        </div>
+        <div class="col-lg-8">
+          <div class="results-area" id="twobytwo-results">
+            <div class="card mb-3"><div class="card-header">Effect Estimates</div><div class="card-body p-2"><div style="min-height:320px" id="twobytwo-plot"></div></div></div>
+            <div class="card"><div class="card-header">Results</div><div class="card-body" id="twobytwo-stats"></div></div>
+          </div>
+          <div id="twobytwo-placeholder" class="text-center text-muted mt-5 pt-5"><i class="bi bi-table" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Enter table and analyse</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Logistic -->
+    <div id="epi-logistic" class="epi-pane" style="display:none">
+      <div class="row g-3">
+        <div class="col-lg-5">
+          <div class="card mb-3">
+            <div class="card-header">Data</div>
+            <div class="card-body">
+              <div class="format-hint">
+                <i class="bi bi-info-circle me-1"></i><strong>Required columns:</strong>
+                one binary <code>outcome</code> column (0/1) + any number of <code>predictor</code> columns (numeric or categorical)
+                <span class="example">diabetes,age,bmi,smoker
+1,62,31.2,yes
+0,45,24.8,no
+1,55,28.1,yes</span>
+              </div>
+              <div class="upload-zone" id="logistic-upload-zone">
+                <input type="file" id="logistic-file" accept=".csv,.xlsx,.xls" style="display:none">
+                <i class="bi bi-cloud-upload d-block mb-2"></i><div class="fw-semibold">Drop file or click</div>
+                <small class="text-muted">CSV or Excel — binary outcome column required</small>
+              </div>
+              <div id="logistic-col-map" style="display:none" class="mt-3">
+                <div class="mb-2"><label class="form-label fw-semibold" style="font-size:.8rem">Outcome column (0/1)</label><select class="form-select form-select-sm" id="logistic-col-outcome"></select></div>
+                <div><label class="form-label fw-semibold" style="font-size:.8rem">Predictor columns</label><div id="logistic-predictors"></div></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-run w-100" id="logistic-run"><i class="bi bi-play-fill me-1"></i> Run Regression</button>
+        </div>
+        <div class="col-lg-7">
+          <div class="results-area" id="logistic-results">
+            <div class="card mb-3"><div class="card-header">Odds Ratio Plot</div><div class="card-body p-2"><div style="min-height:350px" id="logistic-plot"></div></div></div>
+            <div class="card"><div class="card-header">Coefficients</div><div class="card-body" id="logistic-stats"></div></div>
+          </div>
+          <div id="logistic-placeholder" class="text-center text-muted mt-5 pt-5"><i class="bi bi-activity" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Load data and run</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incidence -->
+    <div id="epi-incidence" class="epi-pane" style="display:none">
+      <div class="row g-3">
+        <div class="col-lg-4">
+          <div class="card mb-3">
+            <div class="card-header">Incidence Rate</div>
+            <div class="card-body">
+              <div class="mb-2"><label class="fw-semibold" style="font-size:.85rem">Events (group 1)</label><input type="number" class="form-control form-control-sm" id="ir-events1" value="25" min="0"></div>
+              <div class="mb-2"><label class="fw-semibold" style="font-size:.85rem">Person-time (group 1)</label><input type="number" class="form-control form-control-sm" id="ir-pt1" value="500" min="0.001"></div>
+              <div class="mb-2"><label class="fw-semibold" style="font-size:.85rem">Time unit</label><input type="text" class="form-control form-control-sm" id="ir-unit" value="person-years"></div>
+              <hr class="my-2">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="ir-compare">
+                <label class="form-check-label" style="font-size:.85rem" for="ir-compare">Compare two groups</label>
+              </div>
+              <div id="ir-group2" style="display:none">
+                <div class="mb-2"><label class="fw-semibold" style="font-size:.85rem">Events (group 2)</label><input type="number" class="form-control form-control-sm" id="ir-events2" value="15" min="0"></div>
+                <div><label class="fw-semibold" style="font-size:.85rem">Person-time (group 2)</label><input type="number" class="form-control form-control-sm" id="ir-pt2" value="450" min="0.001"></div>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-run w-100" id="ir-run"><i class="bi bi-play-fill me-1"></i> Calculate</button>
+        </div>
+        <div class="col-lg-8">
+          <div class="results-area" id="ir-results"><div class="card"><div class="card-header">Results</div><div class="card-body" id="ir-stats"></div></div></div>
+          <div id="ir-placeholder" class="text-center text-muted mt-5 pt-5"><i class="bi bi-calendar-check" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Enter data and calculate</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── BIOMARKER ─── -->
+  <div id="section-biomarker" class="section">
+    <div class="page-header">
+      <h4><i class="bi bi-thermometer-half me-2 text-primary"></i>Biomarker Analysis</h4>
+      <p>ROC curve, AUC with 95% CI, optimal threshold (Youden's J), sensitivity/specificity</p>
+    </div>
+    <div class="row g-3">
+      <div class="col-lg-4">
+        <div class="card mb-3">
+          <div class="card-header">Data Input</div>
+          <div class="card-body">
+            <ul class="nav nav-tabs data-source-tabs mb-3" id="bio-tabs">
+              <li class="nav-item"><a class="nav-link active" data-pane="bio-csv" href="#">CSV/Excel</a></li>
+              <li class="nav-item"><a class="nav-link" data-pane="bio-manual" href="#">Manual</a></li>
+            </ul>
+            <div class="data-pane active" id="bio-csv">
+              <div class="format-hint">
+                <i class="bi bi-info-circle me-1"></i><strong>Required columns:</strong>
+                one continuous <code>marker</code> column (numeric) + one binary <code>outcome</code> column (0 = negative, 1 = positive)
+                <span class="example">crp,diagnosis
+0.8,0
+3.2,1
+1.1,0
+5.7,1</span>
+              </div>
+              <div class="upload-zone" id="bio-upload-zone">
+                <input type="file" id="bio-file" accept=".csv,.xlsx,.xls" style="display:none">
+                <i class="bi bi-cloud-upload d-block mb-2"></i><div class="fw-semibold">Drop file or click</div>
+              </div>
+              <div id="bio-col-map" style="display:none" class="mt-3 row g-2">
+                <div class="col-12"><label class="form-label fw-semibold" style="font-size:.8rem">Marker column</label><select class="form-select form-select-sm" id="bio-col-marker"></select></div>
+                <div class="col-12"><label class="form-label fw-semibold" style="font-size:.8rem">Outcome column (0/1)</label><select class="form-select form-select-sm" id="bio-col-outcome"></select></div>
+              </div>
+            </div>
+            <div class="data-pane" id="bio-manual">
+              <div class="mb-2"><label class="fw-semibold" style="font-size:.8rem">Marker values (comma-separated)</label><textarea class="form-control form-control-sm" id="bio-markers" rows="3" placeholder="e.g. 2.1, 3.5, 1.2, 4.0"></textarea></div>
+              <div><label class="fw-semibold" style="font-size:.8rem">Outcome values (0/1)</label><textarea class="form-control form-control-sm" id="bio-outcomes" rows="3" placeholder="e.g. 0, 1, 0, 1"></textarea></div>
+            </div>
+            <hr class="my-3">
+            <div class="mb-2"><label class="fw-semibold" style="font-size:.85rem">Marker name</label><input type="text" class="form-control form-control-sm" id="bio-name" value="Biomarker"></div>
+            <div class="mb-2"><label class="fw-semibold" style="font-size:.85rem">Positive direction</label>
+              <select class="form-select form-select-sm" id="bio-direction">
+                <option value="high">High value → positive</option>
+                <option value="low">Low value → positive</option>
+              </select>
+            </div>
+            <div><label class="fw-semibold" style="font-size:.85rem">Custom threshold <span class="text-muted">(optional)</span></label><input type="number" class="form-control form-control-sm" id="bio-threshold" placeholder="e.g. 2.5" step="any"></div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-run w-100" id="bio-run"><i class="bi bi-play-fill me-1"></i> Run ROC Analysis</button>
+      </div>
+
+      <div class="col-lg-8">
+        <div class="results-area" id="bio-results">
+          <div class="card mb-3"><div class="card-header">ROC Curve</div><div class="card-body p-2"><div class="plot-container" id="bio-roc-plot"></div></div></div>
+          <div class="card mb-3"><div class="card-header">Sensitivity / Specificity Table</div><div class="card-body p-2" id="bio-table"></div></div>
+          <div class="card"><div class="card-header">AUC &amp; Threshold Performance</div><div class="card-body" id="bio-stats"></div></div>
+        </div>
+        <div id="bio-placeholder" class="text-center text-muted mt-5 pt-5">
+          <i class="bi bi-thermometer-half" style="font-size:3rem;opacity:.3"></i><p class="mt-2">Load data and run</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js@2.27.1/dist/plotly.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="/static/app.js"></script>
+
+<!-- ═══════════════ DATA PREVIEW MODAL ═══════════════ -->
+<div id="preview-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);overflow:auto;padding:1.5rem;">
+  <div style="background:#fff;margin:0 auto;border-radius:12px;max-width:1050px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:92vh;">
+    <!-- header -->
+    <div style="padding:.9rem 1.25rem;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <div>
+        <strong id="preview-title">Data Preview</strong>
+        <span id="preview-subtitle" class="text-muted ms-2" style="font-size:.82rem"></span>
+      </div>
+      <button onclick="closePreview()" style="background:none;border:none;font-size:1.5rem;line-height:1;cursor:pointer;color:#6b7280;padding:.1rem .4rem">&times;</button>
+    </div>
+    <!-- controls -->
+    <div style="padding:.85rem 1.25rem;border-bottom:1px solid #e5e7eb;flex-shrink:0;background:#f8fafc">
+      <div class="mb-2 d-flex flex-wrap align-items-center gap-2">
+        <span style="font-size:.8rem;font-weight:600;color:#374151">Columns:</span>
+        <button class="btn btn-sm btn-link py-0 px-1" style="font-size:.78rem" onclick="previewToggleAllCols(true)">Select all</button>
+        <button class="btn btn-sm btn-link py-0 px-1" style="font-size:.78rem" onclick="previewToggleAllCols(false)">Deselect all</button>
+        <div id="preview-col-toggles" style="display:flex;flex-wrap:wrap;gap:.3rem"></div>
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span style="font-size:.8rem;font-weight:600;color:#374151">Filter rows:</span>
+        <input type="text" id="preview-search" class="form-control form-control-sm" style="width:200px" placeholder="Search any column…" oninput="previewApplyFilter()">
+        <span style="font-size:.8rem;color:#6b7280">Row range:</span>
+        <input type="number" id="preview-row-from" class="form-control form-control-sm" style="width:75px" placeholder="from" min="1" oninput="previewApplyFilter()">
+        <span style="font-size:.8rem;color:#6b7280">–</span>
+        <input type="number" id="preview-row-to" class="form-control form-control-sm" style="width:75px" placeholder="to" oninput="previewApplyFilter()">
+        <button class="btn btn-sm btn-outline-secondary" onclick="previewClearFilter()">Clear</button>
+      </div>
+    </div>
+    <!-- table -->
+    <div style="flex:1;overflow:auto;min-height:0">
+      <table id="preview-table" class="table table-sm table-bordered table-hover mb-0" style="font-size:.78rem;white-space:nowrap"></table>
+    </div>
+    <!-- footer -->
+    <div style="padding:.75rem 1.25rem;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+      <span id="preview-status" style="font-size:.82rem;color:#6b7280"></span>
+      <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary" onclick="closePreview()">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="previewApplySelection()"><i class="bi bi-check2 me-1"></i>Apply Selection</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
